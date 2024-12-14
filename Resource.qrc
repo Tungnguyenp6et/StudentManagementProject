@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/Database">
+        <file>DatabaseForm.accdb</file>
+    </qresource>
+    <qresource prefix="/new/prefix1"/>
+</RCC>
