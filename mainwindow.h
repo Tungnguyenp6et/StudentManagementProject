@@ -2,7 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QtCore>
+#include <QCoreApplication>
 #include <QSqlDatabase>
 #include <QFile>
 #include <QDir>
@@ -13,7 +13,12 @@
 #include "registerform.h"
 #include <QMessageBox>
 #include "classviewlayout.h"
-#include <iostream>
+#include <QSqlTableModel>
+#include "percentagedelegate.h"
+#include "numberdelegate.h"
+#include <QItemSelectionModel>
+#include <QStandardPaths>
+#include <QRandomGenerator>
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class MainWindow;
@@ -27,6 +32,8 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     void SetUpTheDatabase();
+    void AfterLogIn();
+    QString GenerateRandomString();
     ~MainWindow();
 private slots:
     void OnSubmitButtonClicked();
@@ -41,6 +48,7 @@ private:
     QFile *MyFile = new QFile(this);
     LogIn *LogInWidget = new LogIn(this);
     ClassViewLayout *ClassLayout;
-
+    QString SubmittedUsername;
+    QString SubmittedPassword;
 };
 #endif // MAINWINDOW_H

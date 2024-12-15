@@ -14,6 +14,7 @@ public:
     QTableView *ClassView = new QTableView(this);
     QPushButton *AddButton = new QPushButton(this);
     QPushButton *RemoveButton = new QPushButton(this);
+    QPushButton *StudentButton = new QPushButton(this);
     QGridLayout *Layout = new QGridLayout(this);
     QLabel *ClassLabel = new QLabel(this);
 signals:

@@ -14,17 +14,24 @@ SOURCES += \
     loweredit.cpp \
     main.cpp \
     mainwindow.cpp \
-    registerform.cpp
+    numberdelegate.cpp \
+    registerform.cpp \
+    percentagedelegate.cpp \
+    studentdialog.cpp
 
 HEADERS += \
     classviewlayout.h \
     login.h \
     loweredit.h \
     mainwindow.h \
-    registerform.h
+    numberdelegate.h \
+    registerform.h \
+    percentagedelegate.h \
+    studentdialog.h
 
 FORMS += \
-    mainwindow.ui
+    mainwindow.ui \
+    studentdialog.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

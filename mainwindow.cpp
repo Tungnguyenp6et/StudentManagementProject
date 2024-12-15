@@ -6,12 +6,12 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    SubmittedUsername = "";
     SetUpTheDatabase();
     this->setCentralWidget(LogInWidget);
     this->setMaximumSize(400,100);
     QObject::connect(LogInWidget->SubmitButton, &QPushButton::clicked, this, &MainWindow::OnSubmitButtonClicked);
     QObject::connect(LogInWidget->Register, &QLabel::linkActivated, this, &MainWindow::OnRegisterButtonClicked);
-
 }
 
 void MainWindow::OnSubmitButtonClicked() {
@@ -20,8 +20,8 @@ void MainWindow::OnSubmitButtonClicked() {
         return;
     }
     QSqlQuery LogInQuery(db);
-    QString SubmittedUsername = LogInWidget->UsernameSpace->text();
-    QString SubmittedPassword = LogInWidget->PasswordSpace->text();
+    SubmittedUsername = LogInWidget->UsernameSpace->text();
+    SubmittedPassword = LogInWidget->PasswordSpace->text();
     QString LogInQueryStatement = QString("SELECT * FROM UserInfor WHERE Username = '%1' AND Password = '%2'").arg(SubmittedUsername).arg(SubmittedPassword);
     if (!LogInQuery.exec(LogInQueryStatement)){
         qDebug() << "Can't retrieve the password: "<< LogInQuery.lastError().text();
@@ -35,6 +35,10 @@ void MainWindow::OnSubmitButtonClicked() {
         ClassLayout = new ClassViewLayout(this);
         this->setCentralWidget(ClassLayout);
         this->setMaximumHeight(600);
+        this->setMinimumHeight(400);
+        this->setMinimumWidth(400);
+        this->setMaximumWidth(600);
+        AfterLogIn();
         return;
     }
     else{
@@ -51,8 +55,8 @@ void MainWindow::OnRegisterButtonClicked() {
     this->setCentralWidget(RegisterWidget);
     QObject::connect(RegisterWidget->SubmitButton, &QPushButton::clicked, this, [=](){
         QSqlQuery RegisterQuery(db);
-        QString SubmittedUsername = RegisterWidget->UsernameSpace->text();
-        QString SubmittedPassword = RegisterWidget->PasswordSpace->text();
+        SubmittedUsername = RegisterWidget->UsernameSpace->text();
+        SubmittedPassword = RegisterWidget->PasswordSpace->text();
         QString SubmittedClassID = RegisterWidget->ClassIDSpace->text();
         QString SubmittedClassName = RegisterWidget->ClassNameSpace->text();
         if (SubmittedUsername.isEmpty() || SubmittedPassword.isEmpty() || SubmittedClassID.isEmpty() || SubmittedClassName.isEmpty()) {
@@ -103,22 +107,104 @@ void MainWindow::OnRegisterButtonClicked() {
         ClassLayout = new ClassViewLayout(this);
         this->setCentralWidget(ClassLayout);
         this->setMaximumHeight(600);
+        this->setMinimumHeight(400);
+        this->setMinimumWidth(400);
+        this->setMaximumWidth(600);
+        AfterLogIn();
     });
+}
+QString MainWindow::GenerateRandomString(){
+    const QString PossibleCharacters{"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"};
+    QString RandomString;
+    for (int i =0; i<10; i++){
+        int index = QRandomGenerator::global()->bounded(PossibleCharacters.length());
+        RandomString.append(PossibleCharacters.at(index));
+    }
+    return RandomString;
 }
 
 
+void MainWindow::AfterLogIn(){
+    QSqlTableModel *ClassModel = new QSqlTableModel(this,db);
+    ClassModel->setTable("UserInfor");
+    ClassLayout->ClassView->setModel(ClassModel);
+    ClassModel->setEditStrategy(QSqlTableModel::OnFieldChange);
+    ClassModel->select();
+    int Column = ClassModel->fieldIndex("Username");
+    if (Column == -1) {
+        qDebug() << "Cant find Username";
+    }
+    for (int Row = 0; Row < ClassModel->rowCount(); Row ++) {
+        QModelIndex Index = ClassModel->index(Row, Column);
+        if (ClassModel->data(Index) == SubmittedUsername){
+            QItemSelectionModel *SelectionModel = ClassLayout->ClassView->selectionModel();
+            SelectionModel->select(Index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        }
+    }
+    PercentageDelegate *DelegatePercentage = new PercentageDelegate(this);
+    ClassLayout->ClassView->setItemDelegateForColumn(4, DelegatePercentage);
+    ClassLayout->ClassView->setItemDelegateForColumn(5, DelegatePercentage);
+    ClassLayout->ClassView->hideColumn(1);
+    ClassLayout->ClassView->hideColumn(0);
+    // Ensuring that classID can't be the same
+    QObject::connect(ClassModel, &QSqlTableModel::dataChanged, this, [=](const QModelIndex topLeft, const QModelIndex bottomRight, const QVector<int> &roles){
+        Q_UNUSED(bottomRight);
+        Q_UNUSED(roles);
+        if(!ClassModel->submitAll()){
+            QString ErrorMessage = ClassModel->lastError().text();
+            QMessageBox::critical(nullptr, "Database error", "Failed to update database: " + ErrorMessage);
+            ClassModel->revertAll();
+        }
+        if (topLeft.column() == 4){
+            double Value = topLeft.data().toDouble();
+            double NewValue = 1 - Value;
+            QModelIndex RelevantIndex = ClassModel->index(topLeft.row(), 5, QModelIndex());
+            if(!ClassModel->setData(RelevantIndex, NewValue)){
+                qDebug() << "Cant not update column 5";
+            }
+        }
+        else if (topLeft.column() == 5){
+            double Value = topLeft.data().toDouble();
+            double NewValue = 1 - Value;
+            QModelIndex RelevantIndex = ClassModel->index(topLeft.row(), 4, QModelIndex());
+            if(!ClassModel->setData(RelevantIndex, NewValue)){
+                qDebug() << "Cant not update column 5";}
+        }
+    });
+    QObject::connect(ClassLayout->AddButton, &QPushButton::clicked, this, [=](){
+        QSqlQuery AddQuery(db);
+        QString AddQueryStatement = QString("INSERT INTO UserInfor(Username, Password, ClassID, ClassName) "
+                                            "VALUES (:Username, :Password, :ClassID, :ClassName)");
+        if (!AddQuery.prepare(AddQueryStatement)){
+            qDebug() << "Failed to prepare query:" << AddQuery.lastError();
+            return;
+        }
+        AddQuery.bindValue(":Username", SubmittedUsername);
+        AddQuery.bindValue(":Password", SubmittedPassword);
+        AddQuery.bindValue(":ClassID", GenerateRandomString());
+        AddQuery.bindValue(":ClassName", GenerateRandomString());
+        if (!AddQuery.exec()){
+            qDebug() << "Failed to execute query:" << AddQuery.lastError();
+            return;
+        }
 
+        qDebug() << "Successfully inserted new row";
 
+        // Refresh the model to reflect the new row
+        ClassModel->select();
 
+        // Find and select the newly added row
+        for (int Row = 0; Row < ClassModel->rowCount(); Row++) {
+            QModelIndex Index = ClassModel->index(Row, 0);
+            if (ClassModel->data(Index) == SubmittedUsername){
+                QItemSelectionModel *AddModel = ClassLayout->ClassView->selectionModel();
+                AddModel->select(Index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+                break;
+            }
+        }
+    });
 
-
-
-
-
-
-
-
-
+}
 void MainWindow::SetUpTheDatabase(){
     MyForm->setFileName(":/Database/DatabaseForm.accdb");
     WriteablePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
